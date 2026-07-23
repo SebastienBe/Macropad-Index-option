@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurateur Macropad Pico 2 (WebHID)</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --surface: #1c1f25;
+    --surface-2: #22262e;
+    --border: rgba(255,255,255,0.08);
+    --text: #e7e9ec;
+    --text-muted: #8b909a;
+    --accent: #4fd1c5;
+    --accent-hover: #38b2ac;
+    --error: #f56565;
+    --success: #48bb78;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 32px 16px;
+    line-height: 1.5;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  .subtitle { color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem; }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--text-muted);
+    display: inline-block;
+    margin-right: 8px;
+  }
+  .status-dot.connected { background: var(--success); }
+  .status-dot.error { background: var(--error); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: 0.95rem;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pin-badge {
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    margin-top: 10px;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .combo-row { display: flex; gap: 8px; }
+  .combo-row select { flex: 1; }
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  button {
+    background: var(--accent);
+    color: #062a27;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .log {
+    background: #0e1013;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 0.8rem;
+    font-family: 'Consolas', monospace;
+    max-height: 160px;
+    overflow-y: auto;
+    color: var(--text-muted);
+  }
+  .log p { margin-bottom: 4px; }
+  .log p.ok { color: var(--success); }
+  .log p.err { color: var(--error); }
+  .browser-warning {
+    background: color-mix(in oklch, var(--error) 12%, var(--surface));
+    border: 1px solid color-mix(in oklch, var(--error) 40%, var(--border));
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Configurateur Macropad — Pico 2</h1>
+  <p class="subtitle">Connecte ta carte en USB, configure chaque bouton, puis envoie la config directement au Pico via WebHID.</p>
+
+  <div class="browser-warning" id="browserWarning">
+    Ton navigateur ne supporte pas WebHID. Utilise Google Chrome ou Microsoft Edge (version récente) sur ordinateur.
+  </div>
+
+  <div class="status-bar">
+    <div><span class="status-dot" id="statusDot"></span><span id="statusText">Non connecté</span></div>
+    <div style="display:flex; gap:10px;">
+      <button id="connectBtn">Connecter le Pico</button>
+      <button id="disconnectBtn" class="secondary" disabled>Déconnecter</button>
+    </div>
+  </div>
+
+  <div class="grid" id="buttonsGrid"></div>
+
+  <div class="card">
+    <h2>Potentiomètre volume (GP26)</h2>
+    <label>Nombre de pas (résolution)</label>
+    <input type="text" id="volSteps" value="30">
+    <label>Seuil avant envoi d'une commande</label>
+    <input type="text" id="volThreshold" value="2">
+    <label>Délai minimum entre 2 commandes (secondes)</label>
+    <input type="text" id="volDelay" value="0.04">
+  </div>
+
+  <div class="actions">
+    <button id="sendBtn" disabled>Envoyer au Pico</button>
+    <button id="downloadBtn" class="secondary">Télécharger keymap.json</button>
+  </div>
+
+  <div class="card">
+    <h2>Journal</h2>
+    <div class="log" id="logOutput"><p>En attente de connexion...</p></div>
+  </div>
+</div>
+
+<script>
+const NUM_BUTTONS = 7;
+const pinNames = ["GP0","GP1","GP2","GP3","GP4","GP5","GP6"];
+const REPORT_LENGTH = 64;
+
+const mediaOptions = [
+  { value: "MUTE", label: "Mute" },
+  { value: "VOLUME_INCREMENT", label: "Volume +" },
+  { value: "VOLUME_DECREMENT", label: "Volume -" },
+  { value: "PLAY_PAUSE", label: "Play / Pause" },
+  { value: "SCAN_NEXT_TRACK", label: "Piste suivante" },
+  { value: "SCAN_PREVIOUS_TRACK", label: "Piste précédente" },
+  { value: "STOP", label: "Stop" },
+];
+
+const modifierOptions = [
+  { value: "", label: "—" },
+  { value: "CONTROL", label: "Ctrl" },
+  { value: "SHIFT", label: "Shift" },
+  { value: "ALT", label: "Alt" },
+  { value: "GUI", label: "Win" },
+];
+
+const keyOptions = [
+  { value: "", label: "—" },
+  ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => ({ value: l, label: l })),
+  { value: "ONE", label: "1" },
+  { value: "TWO", label: "2" },
+  { value: "ESCAPE", label: "Échap" },
+  { value: "TAB", label: "Tab" },
+  { value: "ENTER", label: "Entrée" },
+  { value: "SPACE", label: "Espace" },
+  { value: "DELETE", label: "Suppr" },
+  { value: "F1", label: "F1" },
+  { value: "F2", label: "F2" },
+  { value: "F3", label: "F3" },
+  { value: "F4", label: "F4" },
+  { value: "F5", label: "F5" },
+  { value: "F13", label: "F13" },
+];
+
+const defaultConfig = [
+  { type: "media", media: "MUTE" },
+  { type: "media", media: "SCAN_PREVIOUS_TRACK" },
+  { type: "media", media: "PLAY_PAUSE" },
+  { type: "media", media: "SCAN_NEXT_TRACK" },
+  { type: "key", mod1: "GUI", mod2: "", key: "D" },
+  { type: "key", mod1: "CONTROL", mod2: "ALT", key: "S" },
+  { type: "key", mod1: "CONTROL", mod2: "ALT", key: "D" },
+];
+
+let hidDevice = null;
+
+function log(message, cls) {
+  const logDiv = document.getElementById("logOutput");
+  const p = document.createElement("p");
+  if (cls) p.className = cls;
+  const time = new Date().toLocaleTimeString();
+  p.textContent = `[${time}] ${message}`;
+  logDiv.appendChild(p);
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function setStatus(connected, text) {
+  const dot = document.getElementById("statusDot");
+  dot.classList.remove("connected", "error");
+  if (connected) dot.classList.add("connected");
+  document.getElementById("statusText").textContent = text;
+  document.getElementById("connectBtn").disabled = connected;
+  document.getElementById("disconnectBtn").disabled = !connected;
+  document.getElementById("sendBtn").disabled = !connected;
+}
+
+function buildSelect(id, options, selectedValue) {
+  const opts = options.map(o =>
+    `<option value="${o.value}" ${o.value === selectedValue ? "selected" : ""}>${o.label}</option>`
+  ).join("");
+  return `<select id="${id}">${opts}</select>`;
+}
+
+function renderGrid() {
+  const grid = document.getElementById("buttonsGrid");
+  grid.innerHTML = "";
+
+  for (let i = 0; i < NUM_BUTTONS; i++) {
+    const cfg = defaultConfig[i];
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h2>Bouton ${i} <span class="pin-badge">${pinNames[i]}</span></h2>
+      <label>Type d'action</label>
+      <select id="type-${i}" onchange="toggleType(${i})">
+        <option value="media" ${cfg.type === "media" ? "selected" : ""}>Multimédia</option>
+        <option value="key" ${cfg.type === "key" ? "selected" : ""}>Raccourci clavier</option>
+      </select>
+
+      <div id="media-block-${i}" style="display:${cfg.type === "media" ? "block" : "none"}">
+        <label>Commande multimédia</label>
+        ${buildSelect(`media-${i}`, mediaOptions, cfg.media || "MUTE")}
+      </div>
+
+      <div id="key-block-${i}" style="display:${cfg.type === "key" ? "block" : "none"}">
+        <label>Combinaison de touches</label>
+        <div class="combo-row">
+          ${buildSelect(`mod1-${i}`, modifierOptions, cfg.mod1 || "")}
+          ${buildSelect(`mod2-${i}`, modifierOptions, cfg.mod2 || "")}
+          ${buildSelect(`key-${i}`, keyOptions, cfg.key || "")}
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+function toggleType(i) {
+  const type = document.getElementById(`type-${i}`).value;
+  document.getElementById(`media-block-${i}`).style.display = type === "media" ? "block" : "none";
+  document.getElementById(`key-block-${i}`).style.display = type === "key" ? "block" : "none";
+}
+
+function readConfig() {
+  const buttons = [];
+  for (let i = 0; i < NUM_BUTTONS; i++) {
+    const type = document.getElementById(`type-${i}`).value;
+    if (type === "media") {
+      buttons.push({ type: "media", media: document.getElementById(`media-${i}`).value });
+    } else {
+      const mod1 = document.getElementById(`mod1-${i}`).value;
+      const mod2 = document.getElementById(`mod2-${i}`).value;
+      const key = document.getElementById(`key-${i}`).value;
+      const mods = [mod1, mod2].filter(m => m && m.length > 0);
+      buttons.push({ type: "key", mods, key });
+    }
+  }
+
+  const volume = {
+    steps: parseInt(document.getElementById("volSteps").value || "30", 10),
+    threshold: parseInt(document.getElementById("volThreshold").value || "2", 10),
+    delay: parseFloat(document.getElementById("volDelay").value || "0.04"),
+  };
+
+  return { buttons, volume };
+}
+
+// --- WebHID ---
+
+async function connectDevice() {
+  if (!("hid" in navigator)) {
+    document.getElementById("browserWarning").style.display = "block";
+    log("WebHID non supporté par ce navigateur.", "err");
+    return;
+  }
+
+  try {
+    const filters = [{ usagePage: 0xFFAB, usage: 0x01 }];
+    const devices = await navigator.hid.requestDevice({ filters });
+
+    if (devices.length === 0) {
+      log("Aucun périphérique sélectionné.", "err");
+      return;
+    }
+
+    hidDevice = devices[0];
+    await hidDevice.open();
+
+    hidDevice.addEventListener("inputreport", handleInputReport);
+
+    setStatus(true, `Connecté : ${hidDevice.productName || "Pico Macropad"}`);
+    log("Connexion établie avec le Pico.", "ok");
+  } catch (err) {
+    log("Erreur de connexion : " + err.message, "err");
+    setStatus(false, "Erreur de connexion");
+  }
+}
+
+async function disconnectDevice() {
+  if (hidDevice) {
+    try {
+      await hidDevice.close();
+    } catch (err) {}
+    hidDevice = null;
+  }
+  setStatus(false, "Non connecté");
+  log("Déconnecté.");
+}
+
+function handleInputReport(event) {
+  const { reportId, data } = event;
+  if (reportId === 1) {
+    const status = data.getUint8(0);
+    if (status === 0x01) {
+      log("Configuration appliquée avec succès sur le Pico.", "ok");
+    } else {
+      log("Le Pico a refusé la configuration (JSON invalide ?).", "err");
+    }
+  }
+}
+
+async function sendConfigToDevice() {
+  if (!hidDevice) {
+    log("Aucun appareil connecté.", "err");
+    return;
+  }
+
+  const config = readConfig();
+  const jsonStr = JSON.stringify(config);
+  const encoder = new TextEncoder();
+  const jsonBytes = encoder.encode(jsonStr);
+
+  log(`Envoi de la configuration (${jsonBytes.length} octets)...`);
+
+  try {
+    // Message START : longueur totale sur 2 octets (little-endian)
+    const startReport = new Uint8Array(REPORT_LENGTH);
+    startReport[0] = 1;
+    startReport[1] = jsonBytes.length & 0xFF;
+    startReport[2] = (jsonBytes.length >> 8) & 0xFF;
+    await hidDevice.sendReport(2, startReport);
+    await sleep(15);
+
+    // Messages CHUNK : jusqu'à 62 octets utiles par rapport (byte0 = type, bytes1..62)
+    const chunkSize = 62;
+    for (let offset = 0; offset < jsonBytes.length; offset += chunkSize) {
+      const chunk = jsonBytes.slice(offset, offset + chunkSize);
+      const report = new Uint8Array(REPORT_LENGTH);
+      report[0] = 2;
+      report.set(chunk, 1);
+      await hidDevice.sendReport(2, report);
+      await sleep(15);
+    }
+
+    // Message END : déclenche le parsing + sauvegarde côté Pico
+    const endReport = new Uint8Array(REPORT_LENGTH);
+    endReport[0] = 3;
+    await hidDevice.sendReport(2, endReport);
+
+    log("Configuration transmise, en attente de confirmation du Pico...");
+  } catch (err) {
+    log("Erreur lors de l'envoi : " + err.message, "err");
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function downloadJson() {
+  const config = readConfig();
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "keymap.json";
+  a.click();
+}
+
+document.getElementById("connectBtn").addEventListener("click", connectDevice);
+document.getElementById("disconnectBtn").addEventListener("click", disconnectDevice);
+document.getElementById("sendBtn").addEventListener("click", sendConfigToDevice);
+document.getElementById("downloadBtn").addEventListener("click", downloadJson);
+
+if (!("hid" in navigator)) {
+  document.getElementById("browserWarning").style.display = "block";
+}
+
+renderGrid();
+</script>
+</body>
+</html>

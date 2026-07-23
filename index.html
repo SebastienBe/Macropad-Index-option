@@ -189,11 +189,35 @@
 <script>
 const NUM_BUTTONS = 7;
 const pinNames = ["GP0","GP3","GP5","GP6","GP8","GP10","GP12"];
-const REPORT_LENGTH_OUT = 512;
+const REPORT_LENGTH_OUT = 255;
 const REPORT_LENGTH_IN = 64;
 const REPORT_ID_IN = 10;
 const REPORT_ID_OUT = 11;
-const MAX_JSON_LENGTH = REPORT_LENGTH_OUT - 2;
+const CONFIG_PAYLOAD_LENGTH = 4 + (NUM_BUTTONS * 3);
+
+const MEDIA_MAP = {
+  MUTE: 0,
+  VOLUME_INCREMENT: 1,
+  VOLUME_DECREMENT: 2,
+  PLAY_PAUSE: 3,
+  SCAN_NEXT_TRACK: 4,
+  SCAN_PREVIOUS_TRACK: 5,
+  STOP: 6,
+};
+
+const MOD_MAP = {
+  CONTROL: 1,
+  SHIFT: 2,
+  ALT: 4,
+  GUI: 8,
+};
+
+const KEY_TABLE = [
+  "A","B","C","D","E","F","G","H","I","J","K","L","M",
+  "N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+  "ONE","TWO","ESCAPE","TAB","ENTER","SPACE","DELETE",
+  "F1","F2","F3","F4","F5","F13",
+];
 
 const mediaOptions = [
   { value: "MUTE", label: "Mute" },
@@ -333,6 +357,58 @@ function toggleType(i) {
   document.getElementById(`key-block-${i}`).style.display = type === "key" ? "block" : "none";
 }
 
+function buildBinaryReport() {
+  const report = new Uint8Array(REPORT_LENGTH_OUT);
+  const payload = new Uint8Array(CONFIG_PAYLOAD_LENGTH);
+
+  const steps = parseInt(document.getElementById("volSteps").value || "30", 10);
+  const threshold = parseInt(document.getElementById("volThreshold").value || "2", 10);
+  const delay = parseFloat(document.getElementById("volDelay").value || "0.04");
+  const delayMs = Math.max(0, Math.min(65535, Math.round(delay * 1000)));
+
+  payload[0] = steps;
+  payload[1] = threshold;
+  payload[2] = delayMs & 0xFF;
+  payload[3] = (delayMs >> 8) & 0xFF;
+
+  for (let i = 0; i < NUM_BUTTONS; i++) {
+    const base = 4 + (i * 3);
+    const type = document.getElementById(`type-${i}`).value;
+
+    if (type === "media") {
+      const media = document.getElementById(`media-${i}`).value;
+      if (!(media in MEDIA_MAP)) {
+        throw new Error(`Media non supporte: ${media}`);
+      }
+      payload[base] = 0;
+      payload[base + 1] = MEDIA_MAP[media];
+      payload[base + 2] = 0;
+    } else {
+      const mod1 = document.getElementById(`mod1-${i}`).value;
+      const mod2 = document.getElementById(`mod2-${i}`).value;
+      const key = document.getElementById(`key-${i}`).value;
+      const keyIndex = KEY_TABLE.indexOf(key);
+      if (keyIndex < 0) {
+        throw new Error(`Touche non supportee: ${key}`);
+      }
+      let modFlags = 0;
+      for (const mod of [mod1, mod2]) {
+        if (mod && MOD_MAP[mod] !== undefined) {
+          modFlags |= MOD_MAP[mod];
+        }
+      }
+      payload[base] = 1;
+      payload[base + 1] = modFlags;
+      payload[base + 2] = keyIndex;
+    }
+  }
+
+  report[0] = CONFIG_PAYLOAD_LENGTH & 0xFF;
+  report[1] = (CONFIG_PAYLOAD_LENGTH >> 8) & 0xFF;
+  report.set(payload, 2);
+  return report;
+}
+
 function readConfig() {
   const buttons = [];
   for (let i = 0; i < NUM_BUTTONS; i++) {
@@ -419,26 +495,11 @@ async function sendConfigToDevice() {
     return;
   }
 
-  const config = readConfig();
-  const jsonStr = JSON.stringify(config);
-  const encoder = new TextEncoder();
-  const jsonBytes = encoder.encode(jsonStr);
-
-  log(`Envoi de la configuration (${jsonBytes.length} octets)...`);
-
-  if (jsonBytes.length > MAX_JSON_LENGTH) {
-    log(`Configuration trop grande (${jsonBytes.length} o, max ${MAX_JSON_LENGTH}).`, "err");
-    return;
-  }
-
   try {
     const ackPromise = waitForAck();
+    const report = buildBinaryReport();
 
-    const report = new Uint8Array(REPORT_LENGTH_OUT);
-    report[0] = jsonBytes.length & 0xFF;
-    report[1] = (jsonBytes.length >> 8) & 0xFF;
-    report.set(jsonBytes, 2);
-
+    log(`Envoi binaire (${CONFIG_PAYLOAD_LENGTH} octets)...`);
     await hidDevice.sendReport(REPORT_ID_OUT, report);
 
     log("Configuration transmise, en attente de confirmation du Pico...");

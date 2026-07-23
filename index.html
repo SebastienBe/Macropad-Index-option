@@ -4,196 +4,621 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
-<title>Configurateur Macropad Pico 2 (WebHID)</title>
+<title>Configurateur Macropad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #14161a;
-    --surface: #1c1f25;
-    --surface-2: #22262e;
-    --border: rgba(255,255,255,0.08);
-    --text: #e7e9ec;
-    --text-muted: #8b909a;
-    --accent: #4fd1c5;
-    --accent-hover: #38b2ac;
-    --error: #f56565;
-    --success: #48bb78;
-    --radius: 10px;
+    --bg: #6e6e6e;
+    --bg-deep: #5a5a5a;
+    --panel: #d8d8d8;
+    --panel-soft: #e4e4e4;
+    --ink: #2a2a2a;
+    --ink-soft: #555;
+    --white: #f5f5f5;
+    --accent: #3a3a3a;
+    --ok: #2f8f5b;
+    --err: #c44;
+    --shadow: 0 10px 28px rgba(0,0,0,0.28);
   }
-  * { box-sizing: border-box; margin:0; padding:0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    padding: 32px 16px;
-    line-height: 1.5;
-  }
-  .container { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 1.6rem; margin-bottom: 4px; }
-  .subtitle { color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem; }
 
-  .status-bar {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at 50% 0%, #7a7a7a 0%, var(--bg) 55%, var(--bg-deep) 100%);
+    color: var(--white);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    padding: 28px 18px 40px;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    color: rgba(255,255,255,0.78);
+    font-size: 0.92rem;
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.45;
+  }
+
+  .browser-warning {
+    display: none;
+    background: rgba(196,68,68,0.18);
+    border: 1px solid rgba(196,68,68,0.45);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+  }
+
+  .toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-bottom: 24px;
+    gap: 12px;
     flex-wrap: wrap;
-    gap: 10px;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 12px 16px;
+    margin-bottom: 22px;
+    backdrop-filter: blur(6px);
   }
-  .status-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--text-muted);
-    display: inline-block;
-    margin-right: 8px;
-  }
-  .status-dot.connected { background: var(--success); }
-  .status-dot.error { background: var(--error); }
 
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-  }
-  .card h2 {
-    font-size: 0.95rem;
-    color: var(--accent);
-    margin-bottom: 12px;
+  .status {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.86rem;
   }
-  .pin-badge {
-    background: var(--surface-2);
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #9a9a9a;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
   }
-  label {
+  .status-dot.connected { background: var(--ok); }
+  .status-dot.error { background: var(--err); }
+
+  .toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  button {
+    border: none;
+    cursor: pointer;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 0.86rem;
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
+  }
+  button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .btn-primary {
+    background: linear-gradient(180deg, #efefef, #cfcfcf);
+    color: var(--ink);
+    box-shadow: 0 2px 0 #9a9a9a, 0 6px 14px rgba(0,0,0,0.2);
+  }
+  .btn-secondary {
+    background: rgba(255,255,255,0.12);
+    color: var(--white);
+    border: 1px solid rgba(255,255,255,0.18);
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(320px, 1fr) 300px;
+    gap: 18px;
+    align-items: start;
+    margin-bottom: 20px;
+  }
+
+  .panel {
+    background: linear-gradient(180deg, #e8e8e8, #d2d2d2);
+    color: var(--ink);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    min-height: 220px;
+  }
+
+  .panel h2 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+
+  .panel.hidden { visibility: hidden; opacity: 0; pointer-events: none; }
+  .panel.visible { visibility: visible; opacity: 1; transition: opacity 0.2s ease; }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .preset-btn {
+    background: linear-gradient(180deg, #f4f4f4, #d8d8d8);
+    border: 1px solid #bdbdbd;
+    border-radius: 12px;
+    padding: 10px 6px 8px;
+    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(0,0,0,0.12);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-height: 78px;
+  }
+  .preset-btn:hover:not(:disabled) { background: linear-gradient(180deg, #fff, #e2e2e2); }
+  .preset-btn.active {
+    outline: 2px solid #444;
+    outline-offset: 1px;
+  }
+  .preset-btn .ico {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+  }
+  .preset-btn .ico img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     display: block;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 4px;
+  }
+  .preset-hint {
+    color: var(--ink-soft);
+    font-size: 0.78rem;
+    line-height: 1.35;
     margin-top: 10px;
   }
+
+  .media-extra {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0,0,0,0.08);
+  }
+
+  .pad-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .pad-wrap {
+    position: relative;
+    width: min(100%, 640px);
+    filter: drop-shadow(0 18px 30px rgba(0,0,0,0.35));
+  }
+
+  .pad-wrap img {
+    width: 100%;
+    height: auto;
+    display: block;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .hotspot {
+    position: absolute;
+    border-radius: 14px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .hotspot:hover {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,255,255,0.4);
+  }
+  .hotspot.selected {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(40,40,40,0.55);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.35), inset 0 0 12px rgba(255,255,255,0.2);
+  }
+  .hotspot.knob {
+    border-radius: 50%;
+  }
+  .hotspot .key-icon {
+    width: 46%;
+    height: 46%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.92;
+  }
+  .hotspot.knob .key-icon {
+    display: none;
+  }
+
+  .hint {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.75);
+    text-align: center;
+  }
+
+  .type-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .type-tab {
+    background: #cfcfcf;
+    color: var(--ink);
+    border: 1px solid #b5b5b5;
+    box-shadow: inset 0 1px 0 #fff;
+  }
+  .type-tab.active {
+    background: #3f3f3f;
+    color: #fff;
+    border-color: #2f2f2f;
+    box-shadow: none;
+  }
+
+  label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 10px 0 4px;
+    font-weight: 600;
+  }
+
   select, input[type="text"] {
     width: 100%;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
+    background: #f3f3f3;
+    border: 1px solid #b8b8b8;
+    color: var(--ink);
+    border-radius: 8px;
     padding: 8px 10px;
-    border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+    font-family: inherit;
   }
-  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .combo-row { display: flex; gap: 8px; }
-  .combo-row select { flex: 1; }
+  select:focus, input:focus {
+    outline: 2px solid #555;
+    outline-offset: 1px;
+  }
+
+  .combo-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+  .pin-chip {
+    display: inline-block;
+    background: #3f3f3f;
+    color: #fff;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-family: "IBM Plex Mono", monospace;
+    margin-left: 6px;
+  }
+
+  .selected-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 16px;
+  }
+
+  .card {
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .card h2 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+  }
+
+  .vol-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .gauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+  }
+
+  .gauge-title {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.75);
+    text-align: center;
+    line-height: 1.25;
+    min-height: 2.4em;
+  }
+
+  .gauge-svg {
+    width: 100%;
+    max-width: 140px;
+    height: auto;
+    cursor: grab;
+    touch-action: none;
+  }
+  .gauge-svg:active { cursor: grabbing; }
+
+  .gauge-track {
+    fill: none;
+    stroke: rgba(255,255,255,0.22);
+    stroke-width: 10;
+    stroke-linecap: round;
+  }
+  .gauge-progress {
+    fill: none;
+    stroke: #5b9fd4;
+    stroke-width: 10;
+    stroke-linecap: round;
+  }
+  .gauge-knob-dot {
+    fill: #5b9fd4;
+    stroke: #fff;
+    stroke-width: 1.5;
+  }
+  .gauge-center {
+    fill: #e07a3a;
+  }
+  .gauge-value {
+    fill: #fff;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+  }
+  .gauge-max-badge {
+    fill: rgba(255,255,255,0.18);
+  }
+  .gauge-max-text {
+    fill: rgba(255,255,255,0.85);
+    font-size: 8px;
+    font-family: "IBM Plex Mono", monospace;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+  }
+  .gauge-caption {
+    fill: rgba(255,255,255,0.55);
+    font-size: 7.5px;
+    font-family: "IBM Plex Mono", monospace;
+    text-anchor: middle;
+  }
+
   .actions {
     display: flex;
-    gap: 12px;
-    margin: 24px 0;
+    gap: 10px;
+    margin-top: 14px;
     flex-wrap: wrap;
   }
-  button {
-    background: var(--accent);
-    color: #062a27;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:hover:not(:disabled) { background: var(--accent-hover); }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  button.secondary {
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
+
   .log {
-    background: #0e1013;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    font-size: 0.8rem;
-    font-family: 'Consolas', monospace;
-    max-height: 160px;
+    background: #1d1d1d;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    color: #bdbdbd;
+    max-height: 150px;
     overflow-y: auto;
-    color: var(--text-muted);
   }
   .log p { margin-bottom: 4px; }
-  .log p.ok { color: var(--success); }
-  .log p.err { color: var(--error); }
-  .browser-warning {
-    background: color-mix(in oklch, var(--error) 12%, var(--surface));
-    border: 1px solid color-mix(in oklch, var(--error) 40%, var(--border));
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-bottom: 24px;
+  .log p.ok { color: #6dcea0; }
+  .log p.err { color: #ff8f8f; }
+
+  .empty-state {
+    color: var(--ink-soft);
     font-size: 0.85rem;
-    display: none;
+    line-height: 1.4;
+    padding: 8px 2px;
+  }
+
+  @media (max-width: 980px) {
+    .workspace {
+      grid-template-columns: 1fr;
+    }
+    .panel.hidden { display: none; }
+    .bottom-row { grid-template-columns: 1fr; }
+    .vol-grid {
+      grid-template-columns: 1fr;
+      max-width: 220px;
+      margin: 0 auto;
+    }
   }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>Configurateur Macropad — Pico 2</h1>
-  <p class="subtitle">Connecte ta carte en USB, configure chaque bouton, puis envoie la config directement au Pico via WebHID.</p>
+<div class="page">
+  <header>
+    <h1>Configurateur Macropad</h1>
+    <p class="subtitle">Connecte ta carte en USB, configure chaque bouton, puis envoie la config directement au Pico via WebHID.</p>
+  </header>
 
   <div class="browser-warning" id="browserWarning">
     Ton navigateur ne supporte pas WebHID. Utilise Google Chrome ou Microsoft Edge (version récente) sur ordinateur.
   </div>
 
-  <div class="status-bar">
-    <div><span class="status-dot" id="statusDot"></span><span id="statusText">Non connecté</span></div>
-    <div style="display:flex; gap:10px;">
-      <button id="connectBtn">Connecter le Pico</button>
-      <button id="disconnectBtn" class="secondary" disabled>Déconnecter</button>
+  <div class="toolbar">
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Non connecté</span>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn-primary" id="connectBtn">Connecter le Pico</button>
+      <button class="btn-secondary" id="disconnectBtn" disabled>Déconnecter</button>
     </div>
   </div>
 
-  <div class="grid" id="buttonsGrid"></div>
+  <div class="workspace">
+    <!-- Centre : image cliquable -->
+    <section class="pad-stage">
+      <div class="pad-wrap" id="padWrap">
+        <img src="img/macropad.png" alt="Macropad" width="701" height="414" draggable="false">
+        <!-- Hotspots mesurés sur Group 2.png (701x414) — mapping firmware -->
+        <button class="hotspot" data-btn="4" title="Steam (GP8)" style="left:7.3%; top:14.3%; width:16%; height:27.3%;" aria-label="Steam"><img class="key-icon" alt=""></button>
+        <button class="hotspot" data-btn="5" title="Piste précédente (GP10)" style="left:30.2%; top:14.3%; width:16%; height:26.8%;" aria-label="Piste précédente"><img class="key-icon" alt=""></button>
+        <button class="hotspot" data-btn="1" title="Piste suivante (GP3)" style="left:53.1%; top:14.3%; width:16.7%; height:26.6%;" aria-label="Piste suivante"><img class="key-icon" alt=""></button>
+        <button class="hotspot knob" data-btn="vol" title="Potentiomètre volume (GP26)" style="left:74.5%; top:11%; width:20%; height:34%;" aria-label="Potentiomètre"></button>
+        <button class="hotspot" data-btn="6" title="Discord (GP12)" style="left:7.1%; top:54.6%; width:16%; height:27.5%;" aria-label="Discord"><img class="key-icon" alt=""></button>
+        <button class="hotspot" data-btn="2" title="Retour Windows (GP5)" style="left:30.1%; top:54.6%; width:16.3%; height:27.5%;" aria-label="Desktop"><img class="key-icon" alt=""></button>
+        <button class="hotspot" data-btn="3" title="Play/Pause (GP6)" style="left:53.1%; top:54.6%; width:16.4%; height:27.3%;" aria-label="Play Pause"><img class="key-icon" alt=""></button>
+        <button class="hotspot" data-btn="0" title="Mute (GP0)" style="left:76.2%; top:54.6%; width:16.3%; height:27.5%;" aria-label="Mute"><img class="key-icon" alt=""></button>
+      </div>
+      <p class="hint" id="padHint">Clique une touche pour la configurer.</p>
+    </section>
 
-  <div class="card">
-    <h2>Potentiomètre volume (GP26)</h2>
-    <label>Nombre de pas (résolution)</label>
-    <input type="text" id="volSteps" value="30">
-    <label>Seuil avant envoi d'une commande</label>
-    <input type="text" id="volThreshold" value="2">
-    <label>Délai minimum entre 2 commandes (secondes)</label>
-    <input type="text" id="volDelay" value="0.04">
+    <!-- Droite : édition -->
+    <aside class="panel hidden" id="editPanel">
+      <h2>Édition</h2>
+      <div id="editEmpty" class="empty-state">Sélectionne une touche sur le macropad.</div>
+      <div id="editContent" style="display:none">
+        <div class="selected-title">
+          <span id="editTitle">Bouton</span>
+          <span class="pin-chip" id="editPin">GP0</span>
+        </div>
+
+        <div class="type-tabs">
+          <button type="button" class="type-tab" id="tabMedia">Multimédia</button>
+          <button type="button" class="type-tab" id="tabKey">Raccourci</button>
+        </div>
+
+        <div id="mediaBlock">
+          <div class="preset-grid" id="presetGrid"></div>
+          <p class="preset-hint">Clique un preset pour l’appliquer à la touche sélectionnée.</p>
+          <div class="media-extra">
+            <label for="mediaSelect">Autre commande multimédia</label>
+            <select id="mediaSelect"></select>
+          </div>
+        </div>
+
+        <div id="keyBlock" style="display:none">
+          <label>Combinaison de touches</label>
+          <div class="combo-row">
+            <select id="mod1Select"></select>
+            <select id="mod2Select"></select>
+            <select id="keySelect"></select>
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
 
-  <div class="actions">
-    <button id="sendBtn" disabled>Envoyer au Pico</button>
-    <button id="downloadBtn" class="secondary">Télécharger keymap.json</button>
-  </div>
+  <div class="bottom-row">
+    <div class="card">
+      <h2>Potentiomètre volume (GP26)</h2>
+      <div class="vol-grid" id="volGauges"></div>
+      <div class="actions">
+        <button class="btn-primary" id="sendBtn" disabled>Envoyer au Pico</button>
+        <button class="btn-secondary" id="downloadBtn">Télécharger keymap.json</button>
+      </div>
+    </div>
 
-  <div class="card">
-    <h2>Journal</h2>
-    <div class="log" id="logOutput"><p>En attente de connexion...</p></div>
+    <div class="card">
+      <h2>Journal</h2>
+      <div class="log" id="logOutput"><p>En attente de connexion...</p></div>
+    </div>
   </div>
 </div>
 
 <script>
 const NUM_BUTTONS = 7;
 const pinNames = ["GP0","GP3","GP5","GP6","GP8","GP10","GP12"];
+const buttonLabels = [
+  "Mute",
+  "Piste suivante",
+  "Retour Windows",
+  "Play / Pause",
+  "Steam",
+  "Piste précédente",
+  "Discord",
+];
+
 const REPORT_LENGTH_OUT = 63;
 const REPORT_LENGTH_IN = 63;
 const REPORT_ID_IN = 10;
 const REPORT_ID_OUT = 11;
 const CONFIG_PAYLOAD_LENGTH = 4 + (NUM_BUTTONS * 3);
+
+const volumeGauges = [
+  {
+    id: "steps",
+    title: "Nombre de pas (résolution)",
+    min: 2,
+    max: 50,
+    step: 1,
+    value: 30,
+    decimals: 0,
+  },
+  {
+    id: "threshold",
+    title: "Seuil avant envoi d'une commande",
+    min: 1,
+    max: 20,
+    step: 1,
+    value: 2,
+    decimals: 0,
+  },
+  {
+    id: "delay",
+    title: "Délai minimum entre 2 commandes (s)",
+    min: 0.01,
+    max: 0.5,
+    step: 0.01,
+    value: 0.04,
+    decimals: 2,
+  },
+];
+
+const volumeState = {
+  steps: 30,
+  threshold: 2,
+  delay: 0.04,
+};
 
 const MEDIA_MAP = {
   MUTE: 0,
@@ -255,6 +680,90 @@ const keyOptions = [
   { value: "F13", label: "F13" },
 ];
 
+const presets = [
+  {
+    id: "prev",
+    label: "Précédent",
+    icon: "svg/previous.svg",
+    config: { type: "media", media: "SCAN_PREVIOUS_TRACK" },
+  },
+  {
+    id: "next",
+    label: "Suivant",
+    icon: "svg/next.svg",
+    config: { type: "media", media: "SCAN_NEXT_TRACK" },
+  },
+  {
+    id: "play",
+    label: "Play/pause",
+    icon: "svg/play-pause.svg",
+    config: { type: "media", media: "PLAY_PAUSE" },
+  },
+  {
+    id: "mute",
+    label: "Mute",
+    icon: "svg/mute.svg",
+    config: { type: "media", media: "MUTE" },
+  },
+  {
+    id: "steam",
+    label: "Steam",
+    icon: "svg/steam.svg",
+    config: { type: "key", mod1: "CONTROL", mod2: "ALT", key: "D" },
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    icon: "svg/discord.svg",
+    config: { type: "key", mod1: "CONTROL", mod2: "ALT", key: "S" },
+  },
+  {
+    id: "desktop",
+    label: "Desktop",
+    icon: "svg/Rwin.svg",
+    config: { type: "key", mod1: "GUI", mod2: "", key: "D" },
+  },
+  {
+    id: "stop",
+    label: "Stop",
+    icon: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none"><rect x="12" y="12" width="24" height="24" rx="3" fill="#8C8D8F"/></svg>'),
+    config: { type: "media", media: "STOP" },
+  },
+];
+
+function iconForConfig(cfg) {
+  if (!cfg) return "";
+  const match = presets.find(p => {
+    if (cfg.type === "media" && p.config.type === "media") {
+      return cfg.media === p.config.media;
+    }
+    if (cfg.type === "key" && p.config.type === "key") {
+      return cfg.mod1 === p.config.mod1 &&
+        (cfg.mod2 || "") === (p.config.mod2 || "") &&
+        cfg.key === p.config.key;
+    }
+    return false;
+  });
+  return match ? match.icon : "";
+}
+
+function updatePadIcons() {
+  document.querySelectorAll(".hotspot[data-btn]").forEach(h => {
+    const id = h.dataset.btn;
+    if (id === "vol") return;
+    const img = h.querySelector(".key-icon");
+    if (!img) return;
+    const src = iconForConfig(buttonConfig[parseInt(id, 10)]);
+    if (src) {
+      img.src = src;
+      img.style.display = "block";
+    } else {
+      img.removeAttribute("src");
+      img.style.display = "none";
+    }
+  });
+}
+
 const defaultConfig = [
   { type: "media", media: "MUTE" },
   { type: "media", media: "SCAN_NEXT_TRACK" },
@@ -265,14 +774,15 @@ const defaultConfig = [
   { type: "key", mod1: "CONTROL", mod2: "ALT", key: "S" },
 ];
 
+let buttonConfig = defaultConfig.map(c => ({ ...c }));
+let selectedBtn = null;
 let hidDevice = null;
 let ackWaiter = null;
+let syncingUi = false;
 
 function waitForAck(timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
-    if (ackWaiter) {
-      clearTimeout(ackWaiter.timer);
-    }
+    if (ackWaiter) clearTimeout(ackWaiter.timer);
     const timer = setTimeout(() => {
       ackWaiter = null;
       reject(new Error("timeout"));
@@ -294,8 +804,7 @@ function log(message, cls) {
   const logDiv = document.getElementById("logOutput");
   const p = document.createElement("p");
   if (cls) p.className = cls;
-  const time = new Date().toLocaleTimeString();
-  p.textContent = `[${time}] ${message}`;
+  p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   logDiv.appendChild(p);
   logDiv.scrollTop = logDiv.scrollHeight;
 }
@@ -310,60 +819,298 @@ function setStatus(connected, text) {
   document.getElementById("sendBtn").disabled = !connected;
 }
 
-function buildSelect(id, options, selectedValue) {
-  const opts = options.map(o =>
-    `<option value="${o.value}" ${o.value === selectedValue ? "selected" : ""}>${o.label}</option>`
+function fillSelect(el, options, selected) {
+  el.innerHTML = options.map(o =>
+    `<option value="${o.value}" ${o.value === selected ? "selected" : ""}>${o.label}</option>`
   ).join("");
-  return `<select id="${id}">${opts}</select>`;
 }
 
-function renderGrid() {
-  const grid = document.getElementById("buttonsGrid");
-  grid.innerHTML = "";
+function initSelects() {
+  fillSelect(document.getElementById("mediaSelect"), mediaOptions, "MUTE");
+  fillSelect(document.getElementById("mod1Select"), modifierOptions, "");
+  fillSelect(document.getElementById("mod2Select"), modifierOptions, "");
+  fillSelect(document.getElementById("keySelect"), keyOptions, "");
+}
 
-  for (let i = 0; i < NUM_BUTTONS; i++) {
-    const cfg = defaultConfig[i];
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <h2>Bouton ${i} <span class="pin-badge">${pinNames[i]}</span></h2>
-      <label>Type d'action</label>
-      <select id="type-${i}" onchange="toggleType(${i})">
-        <option value="media" ${cfg.type === "media" ? "selected" : ""}>Multimédia</option>
-        <option value="key" ${cfg.type === "key" ? "selected" : ""}>Raccourci clavier</option>
-      </select>
+// --- Jauges potentiomètre ---
 
-      <div id="media-block-${i}" style="display:${cfg.type === "media" ? "block" : "none"}">
-        <label>Commande multimédia</label>
-        ${buildSelect(`media-${i}`, mediaOptions, cfg.media || "MUTE")}
-      </div>
+const GAUGE_START = -210; // deg
+const GAUGE_SWEEP = 240;  // deg
 
-      <div id="key-block-${i}" style="display:${cfg.type === "key" ? "block" : "none"}">
-        <label>Combinaison de touches</label>
-        <div class="combo-row">
-          ${buildSelect(`mod1-${i}`, modifierOptions, cfg.mod1 || "")}
-          ${buildSelect(`mod2-${i}`, modifierOptions, cfg.mod2 || "")}
-          ${buildSelect(`key-${i}`, keyOptions, cfg.key || "")}
-        </div>
+function polar(cx, cy, r, deg) {
+  const rad = (deg - 90) * Math.PI / 180;
+  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+}
+
+function describeArc(cx, cy, r, startDeg, endDeg) {
+  const [x1, y1] = polar(cx, cy, r, startDeg);
+  const [x2, y2] = polar(cx, cy, r, endDeg);
+  const large = endDeg - startDeg <= 180 ? 0 : 1;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+}
+
+function formatGaugeValue(spec) {
+  const v = volumeState[spec.id];
+  return spec.decimals > 0 ? v.toFixed(spec.decimals) : String(Math.round(v));
+}
+
+function clampGaugeValue(spec, raw) {
+  const stepped = Math.round((raw - spec.min) / spec.step) * spec.step + spec.min;
+  const clamped = Math.min(spec.max, Math.max(spec.min, stepped));
+  return spec.decimals > 0
+    ? Number(clamped.toFixed(spec.decimals))
+    : Math.round(clamped);
+}
+
+function ratioFromValue(spec) {
+  return (volumeState[spec.id] - spec.min) / (spec.max - spec.min);
+}
+
+function valueFromPointer(spec, svg, clientX, clientY) {
+  const rect = svg.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height * (58 / 120);
+  let deg = Math.atan2(clientY - cy, clientX - cx) * 180 / Math.PI + 90;
+  // Normalize relative to arc start
+  let rel = deg - GAUGE_START;
+  while (rel < 0) rel += 360;
+  while (rel > 360) rel -= 360;
+  // Clamp to sweep
+  if (rel > GAUGE_SWEEP && rel < GAUGE_SWEEP + (360 - GAUGE_SWEEP) / 2) {
+    rel = GAUGE_SWEEP;
+  } else if (rel > GAUGE_SWEEP) {
+    rel = 0;
+  }
+  const ratio = rel / GAUGE_SWEEP;
+  return clampGaugeValue(spec, spec.min + ratio * (spec.max - spec.min));
+}
+
+function updateGaugeVisual(spec) {
+  const svg = document.getElementById(`gauge-svg-${spec.id}`);
+  if (!svg) return;
+  const ratio = ratioFromValue(spec);
+  const end = GAUGE_START + GAUGE_SWEEP * ratio;
+  const progress = svg.querySelector(".gauge-progress");
+  const dot = svg.querySelector(".gauge-knob-dot");
+  const valueText = svg.querySelector(".gauge-value");
+  const cx = 60, cy = 58, r = 42;
+  progress.setAttribute("d", describeArc(cx, cy, r, GAUGE_START, Math.max(GAUGE_START + 0.01, end)));
+  const [dx, dy] = polar(cx, cy, r, end);
+  dot.setAttribute("cx", dx);
+  dot.setAttribute("cy", dy);
+  valueText.textContent = formatGaugeValue(spec);
+}
+
+function bindGaugeInteraction(spec, svg) {
+  let dragging = false;
+
+  const apply = (e) => {
+    const point = e.touches ? e.touches[0] : e;
+    volumeState[spec.id] = valueFromPointer(spec, svg, point.clientX, point.clientY);
+    updateGaugeVisual(spec);
+  };
+
+  const onDown = (e) => {
+    dragging = true;
+    svg.setPointerCapture?.(e.pointerId);
+    apply(e);
+    e.preventDefault();
+  };
+  const onMove = (e) => {
+    if (!dragging) return;
+    apply(e);
+    e.preventDefault();
+  };
+  const onUp = () => { dragging = false; };
+
+  svg.addEventListener("pointerdown", onDown);
+  svg.addEventListener("pointermove", onMove);
+  svg.addEventListener("pointerup", onUp);
+  svg.addEventListener("pointercancel", onUp);
+}
+
+function renderVolumeGauges() {
+  const host = document.getElementById("volGauges");
+  const cx = 60, cy = 58, r = 42;
+  const trackEnd = GAUGE_START + GAUGE_SWEEP;
+  const [maxX, maxY] = polar(cx, cy, r, trackEnd);
+
+  host.innerHTML = volumeGauges.map(spec => {
+    volumeState[spec.id] = clampGaugeValue(spec, volumeState[spec.id]);
+    const ratio = ratioFromValue(spec);
+    const end = GAUGE_START + GAUGE_SWEEP * ratio;
+    const [dx, dy] = polar(cx, cy, r, end);
+    const maxLabel = spec.decimals > 0 ? spec.max.toFixed(spec.decimals) : String(spec.max);
+
+    return `
+      <div class="gauge" data-gauge="${spec.id}">
+        <div class="gauge-title">${spec.title}</div>
+        <svg class="gauge-svg" id="gauge-svg-${spec.id}" viewBox="0 0 120 110" role="slider"
+             aria-valuemin="${spec.min}" aria-valuemax="${spec.max}" aria-valuenow="${volumeState[spec.id]}"
+             aria-label="${spec.title}">
+          <path class="gauge-track" d="${describeArc(cx, cy, r, GAUGE_START, trackEnd)}"></path>
+          <path class="gauge-progress" d="${describeArc(cx, cy, r, GAUGE_START, Math.max(GAUGE_START + 0.01, end))}"></path>
+          <circle class="gauge-knob-dot" cx="${dx}" cy="${dy}" r="5"></circle>
+          <circle class="gauge-center" cx="${cx}" cy="${cy}" r="22"></circle>
+          <text class="gauge-value" x="${cx}" y="${cy}">${formatGaugeValue(spec)}</text>
+          <circle class="gauge-max-badge" cx="${maxX}" cy="${maxY}" r="9"></circle>
+          <text class="gauge-max-text" x="${maxX}" y="${maxY}">${maxLabel}</text>
+          <text class="gauge-caption" x="${cx}" y="100">min ${spec.min} · max ${maxLabel}</text>
+        </svg>
       </div>
     `;
-    grid.appendChild(card);
+  }).join("");
+
+  volumeGauges.forEach(spec => {
+    const svg = document.getElementById(`gauge-svg-${spec.id}`);
+    bindGaugeInteraction(spec, svg);
+  });
+}
+
+function renderPresets() {
+  const grid = document.getElementById("presetGrid");
+  grid.innerHTML = presets.map(p => `
+    <button type="button" class="preset-btn" data-preset="${p.id}">
+      <div class="ico"><img src="${p.icon}" alt=""></div>
+      <span>${p.label}</span>
+    </button>
+  `).join("");
+
+  grid.querySelectorAll(".preset-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const preset = presets.find(p => p.id === btn.dataset.preset);
+      if (!preset || selectedBtn === null) return;
+      buttonConfig[selectedBtn] = { ...preset.config };
+      syncingUi = true;
+      if (preset.config.type === "media") {
+        document.getElementById("mediaSelect").value = preset.config.media;
+      } else {
+        document.getElementById("mod1Select").value = preset.config.mod1 || "";
+        document.getElementById("mod2Select").value = preset.config.mod2 || "";
+        document.getElementById("keySelect").value = preset.config.key || "";
+      }
+      syncingUi = false;
+      highlightMatchingPreset();
+      updatePadIcons();
+      log(`Preset « ${preset.label} » appliqué à ${buttonLabels[selectedBtn]}.`);
+    });
+  });
+}
+
+function highlightMatchingPreset() {
+  if (selectedBtn === null) return;
+  const cfg = buttonConfig[selectedBtn];
+  document.querySelectorAll(".preset-btn").forEach(btn => {
+    const preset = presets.find(p => p.id === btn.dataset.preset);
+    let match = false;
+    if (preset) {
+      if (cfg.type === "media" && preset.config.type === "media") {
+        match = cfg.media === preset.config.media;
+      } else if (cfg.type === "key" && preset.config.type === "key") {
+        match = cfg.mod1 === preset.config.mod1 &&
+                (cfg.mod2 || "") === (preset.config.mod2 || "") &&
+                cfg.key === preset.config.key;
+      }
+    }
+    btn.classList.toggle("active", match);
+  });
+}
+
+function showPanels(show) {
+  const edit = document.getElementById("editPanel");
+  if (show) {
+    edit.classList.remove("hidden");
+    edit.classList.add("visible");
+  } else {
+    edit.classList.add("hidden");
+    edit.classList.remove("visible");
   }
 }
 
-function toggleType(i) {
-  const type = document.getElementById(`type-${i}`).value;
-  document.getElementById(`media-block-${i}`).style.display = type === "media" ? "block" : "none";
-  document.getElementById(`key-block-${i}`).style.display = type === "key" ? "block" : "none";
+function setTypeUi(type) {
+  const isMedia = type === "media";
+  document.getElementById("tabMedia").classList.toggle("active", isMedia);
+  document.getElementById("tabKey").classList.toggle("active", !isMedia);
+  document.getElementById("mediaBlock").style.display = isMedia ? "block" : "none";
+  document.getElementById("keyBlock").style.display = isMedia ? "none" : "block";
+}
+
+function refreshEditPanel() {
+  if (selectedBtn === null) {
+    document.getElementById("editEmpty").style.display = "block";
+    document.getElementById("editContent").style.display = "none";
+    return;
+  }
+
+  document.getElementById("editEmpty").style.display = "none";
+  document.getElementById("editContent").style.display = "block";
+  document.getElementById("editTitle").textContent = buttonLabels[selectedBtn];
+  document.getElementById("editPin").textContent = pinNames[selectedBtn];
+
+  const cfg = buttonConfig[selectedBtn];
+  syncingUi = true;
+  setTypeUi(cfg.type);
+  if (cfg.type === "media") {
+    document.getElementById("mediaSelect").value = cfg.media || "MUTE";
+  } else {
+    document.getElementById("mod1Select").value = cfg.mod1 || "";
+    document.getElementById("mod2Select").value = cfg.mod2 || "";
+    document.getElementById("keySelect").value = cfg.key || "";
+  }
+  syncingUi = false;
+  highlightMatchingPreset();
+  updatePadIcons();
+}
+
+function selectButton(index) {
+  selectedBtn = index;
+  document.querySelectorAll(".hotspot").forEach(h => {
+    h.classList.toggle("selected", h.dataset.btn === String(index));
+  });
+  showPanels(true);
+  refreshEditPanel();
+  document.getElementById("padHint").textContent =
+    `Touche sélectionnée : ${buttonLabels[index]} (${pinNames[index]})`;
+}
+
+function selectVolume() {
+  selectedBtn = null;
+  document.querySelectorAll(".hotspot").forEach(h => {
+    h.classList.toggle("selected", h.dataset.btn === "vol");
+  });
+  showPanels(false);
+  document.getElementById("padHint").textContent =
+    "Potentiomètre sélectionné — règle les jauges ci-dessous (GP26).";
+  document.getElementById("volGauges")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function readCurrentFromUi() {
+  if (selectedBtn === null || syncingUi) return;
+  const type = document.getElementById("tabMedia").classList.contains("active") ? "media" : "key";
+  if (type === "media") {
+    buttonConfig[selectedBtn] = {
+      type: "media",
+      media: document.getElementById("mediaSelect").value,
+    };
+  } else {
+    buttonConfig[selectedBtn] = {
+      type: "key",
+      mod1: document.getElementById("mod1Select").value,
+      mod2: document.getElementById("mod2Select").value,
+      key: document.getElementById("keySelect").value,
+    };
+  }
+  highlightMatchingPreset();
+  updatePadIcons();
 }
 
 function buildBinaryReport() {
   const report = new Uint8Array(REPORT_LENGTH_OUT);
   const payload = new Uint8Array(CONFIG_PAYLOAD_LENGTH);
 
-  const steps = parseInt(document.getElementById("volSteps").value || "30", 10);
-  const threshold = parseInt(document.getElementById("volThreshold").value || "2", 10);
-  const delay = parseFloat(document.getElementById("volDelay").value || "0.04");
+  const steps = volumeState.steps;
+  const threshold = volumeState.threshold;
+  const delay = volumeState.delay;
   const delayMs = Math.max(0, Math.min(65535, Math.round(delay * 1000)));
 
   payload[0] = steps;
@@ -373,29 +1120,19 @@ function buildBinaryReport() {
 
   for (let i = 0; i < NUM_BUTTONS; i++) {
     const base = 4 + (i * 3);
-    const type = document.getElementById(`type-${i}`).value;
+    const cfg = buttonConfig[i];
 
-    if (type === "media") {
-      const media = document.getElementById(`media-${i}`).value;
-      if (!(media in MEDIA_MAP)) {
-        throw new Error(`Media non supporte: ${media}`);
-      }
+    if (cfg.type === "media") {
+      if (!(cfg.media in MEDIA_MAP)) throw new Error(`Media non supporté: ${cfg.media}`);
       payload[base] = 0;
-      payload[base + 1] = MEDIA_MAP[media];
+      payload[base + 1] = MEDIA_MAP[cfg.media];
       payload[base + 2] = 0;
     } else {
-      const mod1 = document.getElementById(`mod1-${i}`).value;
-      const mod2 = document.getElementById(`mod2-${i}`).value;
-      const key = document.getElementById(`key-${i}`).value;
-      const keyIndex = KEY_TABLE.indexOf(key);
-      if (keyIndex < 0) {
-        throw new Error(`Touche non supportee: ${key}`);
-      }
+      const keyIndex = KEY_TABLE.indexOf(cfg.key);
+      if (keyIndex < 0) throw new Error(`Touche non supportée: ${cfg.key}`);
       let modFlags = 0;
-      for (const mod of [mod1, mod2]) {
-        if (mod && MOD_MAP[mod] !== undefined) {
-          modFlags |= MOD_MAP[mod];
-        }
+      for (const mod of [cfg.mod1, cfg.mod2]) {
+        if (mod && MOD_MAP[mod] !== undefined) modFlags |= MOD_MAP[mod];
       }
       payload[base] = 1;
       payload[base + 1] = modFlags;
@@ -410,30 +1147,20 @@ function buildBinaryReport() {
 }
 
 function readConfig() {
-  const buttons = [];
-  for (let i = 0; i < NUM_BUTTONS; i++) {
-    const type = document.getElementById(`type-${i}`).value;
-    if (type === "media") {
-      buttons.push({ type: "media", media: document.getElementById(`media-${i}`).value });
-    } else {
-      const mod1 = document.getElementById(`mod1-${i}`).value;
-      const mod2 = document.getElementById(`mod2-${i}`).value;
-      const key = document.getElementById(`key-${i}`).value;
-      const mods = [mod1, mod2].filter(m => m && m.length > 0);
-      buttons.push({ type: "key", mods, key });
-    }
-  }
-
-  const volume = {
-    steps: parseInt(document.getElementById("volSteps").value || "30", 10),
-    threshold: parseInt(document.getElementById("volThreshold").value || "2", 10),
-    delay: parseFloat(document.getElementById("volDelay").value || "0.04"),
+  const buttons = buttonConfig.map(cfg => {
+    if (cfg.type === "media") return { type: "media", media: cfg.media };
+    const mods = [cfg.mod1, cfg.mod2].filter(m => m && m.length > 0);
+    return { type: "key", mods, key: cfg.key };
+  });
+  return {
+    buttons,
+    volume: {
+      steps: volumeState.steps,
+      threshold: volumeState.threshold,
+      delay: volumeState.delay,
+    },
   };
-
-  return { buttons, volume };
 }
-
-// --- WebHID ---
 
 async function connectDevice() {
   if (!("hid" in navigator)) {
@@ -445,7 +1172,6 @@ async function connectDevice() {
   try {
     const filters = [{ usagePage: 0xFFAB, usage: 0x01 }];
     const devices = await navigator.hid.requestDevice({ filters });
-
     if (devices.length === 0) {
       log("Aucun périphérique sélectionné.", "err");
       return;
@@ -453,9 +1179,7 @@ async function connectDevice() {
 
     hidDevice = devices[0];
     await hidDevice.open();
-
     hidDevice.addEventListener("inputreport", handleInputReport);
-
     setStatus(true, `Connecté : ${hidDevice.productName || "Pico Macropad"}`);
     log("Connexion établie avec le Pico.", "ok");
   } catch (err) {
@@ -466,9 +1190,7 @@ async function connectDevice() {
 
 async function disconnectDevice() {
   if (hidDevice) {
-    try {
-      await hidDevice.close();
-    } catch (err) {}
+    try { await hidDevice.close(); } catch (err) {}
     hidDevice = null;
   }
   setStatus(false, "Non connecté");
@@ -478,13 +1200,12 @@ async function disconnectDevice() {
 function handleInputReport(event) {
   const { reportId, data } = event;
   if (reportId !== REPORT_ID_IN) return;
-
   const status = data.byteLength > 0 ? data.getUint8(0) : 0xFF;
   if (status === 0x01) {
     log("Configuration appliquée avec succès sur le Pico.", "ok");
     settleAck(true);
   } else {
-    log("Le Pico a refusé la configuration (JSON invalide ?).", "err");
+    log("Le Pico a refusé la configuration.", "err");
     settleAck(false);
   }
 }
@@ -494,29 +1215,20 @@ async function sendConfigToDevice() {
     log("Aucun appareil connecté.", "err");
     return;
   }
-
   try {
     const ackPromise = waitForAck();
     const report = buildBinaryReport();
-
     log(`Envoi binaire (${CONFIG_PAYLOAD_LENGTH} octets)...`);
     await hidDevice.sendReport(REPORT_ID_OUT, report);
-
     log("Configuration transmise, en attente de confirmation du Pico...");
     await ackPromise;
   } catch (err) {
     if (err.message === "timeout") {
-      log("Pas de confirmation du Pico. Verifie boot.py/code.py a jour puis reconnecte.", "err");
-    } else if (err.message === "refused") {
-      // message deja loggue dans handleInputReport
-    } else {
+      log("Pas de confirmation du Pico. Vérifie boot.py/code.py à jour puis reconnecte.", "err");
+    } else if (err.message !== "refused") {
       log("Erreur lors de l'envoi : " + err.message, "err");
     }
   }
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function downloadJson() {
@@ -528,6 +1240,46 @@ function downloadJson() {
   a.click();
 }
 
+document.querySelectorAll(".hotspot").forEach(h => {
+  h.addEventListener("click", () => {
+    const id = h.dataset.btn;
+    if (id === "vol") selectVolume();
+    else selectButton(parseInt(id, 10));
+  });
+});
+
+document.getElementById("tabMedia").addEventListener("click", () => {
+  if (selectedBtn === null) return;
+  setTypeUi("media");
+  // Si la config actuelle n'est pas media, on garde jusqu'à choix d'un preset / select
+  highlightMatchingPreset();
+});
+
+document.getElementById("tabKey").addEventListener("click", () => {
+  if (selectedBtn === null) return;
+  const cfg = buttonConfig[selectedBtn];
+  if (cfg.type !== "key") {
+    buttonConfig[selectedBtn] = {
+      type: "key",
+      mod1: cfg.mod1 || "",
+      mod2: cfg.mod2 || "",
+      key: cfg.key || "A",
+    };
+  }
+  syncingUi = true;
+  document.getElementById("mod1Select").value = buttonConfig[selectedBtn].mod1 || "";
+  document.getElementById("mod2Select").value = buttonConfig[selectedBtn].mod2 || "";
+  document.getElementById("keySelect").value = buttonConfig[selectedBtn].key || "A";
+  syncingUi = false;
+  setTypeUi("key");
+  highlightMatchingPreset();
+  updatePadIcons();
+});
+
+["mediaSelect", "mod1Select", "mod2Select", "keySelect"].forEach(id => {
+  document.getElementById(id).addEventListener("change", readCurrentFromUi);
+});
+
 document.getElementById("connectBtn").addEventListener("click", connectDevice);
 document.getElementById("disconnectBtn").addEventListener("click", disconnectDevice);
 document.getElementById("sendBtn").addEventListener("click", sendConfigToDevice);
@@ -537,7 +1289,10 @@ if (!("hid" in navigator)) {
   document.getElementById("browserWarning").style.display = "block";
 }
 
-renderGrid();
+initSelects();
+renderPresets();
+renderVolumeGauges();
+updatePadIcons();
 </script>
 </body>
 </html>

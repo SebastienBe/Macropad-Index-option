@@ -189,9 +189,11 @@
 <script>
 const NUM_BUTTONS = 7;
 const pinNames = ["GP0","GP3","GP5","GP6","GP8","GP10","GP12"];
-const REPORT_LENGTH = 64;
+const REPORT_LENGTH_OUT = 512;
+const REPORT_LENGTH_IN = 64;
 const REPORT_ID_IN = 10;
 const REPORT_ID_OUT = 11;
+const MAX_JSON_LENGTH = REPORT_LENGTH_OUT - 2;
 
 const mediaOptions = [
   { value: "MUTE", label: "Mute" },
@@ -231,12 +233,12 @@ const keyOptions = [
 
 const defaultConfig = [
   { type: "media", media: "MUTE" },
-  { type: "media", media: "SCAN_PREVIOUS_TRACK" },
-  { type: "media", media: "PLAY_PAUSE" },
   { type: "media", media: "SCAN_NEXT_TRACK" },
   { type: "key", mod1: "GUI", mod2: "", key: "D" },
-  { type: "key", mod1: "CONTROL", mod2: "ALT", key: "S" },
+  { type: "media", media: "PLAY_PAUSE" },
   { type: "key", mod1: "CONTROL", mod2: "ALT", key: "D" },
+  { type: "media", media: "SCAN_PREVIOUS_TRACK" },
+  { type: "key", mod1: "CONTROL", mod2: "ALT", key: "S" },
 ];
 
 let hidDevice = null;
@@ -424,39 +426,28 @@ async function sendConfigToDevice() {
 
   log(`Envoi de la configuration (${jsonBytes.length} octets)...`);
 
-  const PACKET_DELAY_MS = 60;
+  if (jsonBytes.length > MAX_JSON_LENGTH) {
+    log(`Configuration trop grande (${jsonBytes.length} o, max ${MAX_JSON_LENGTH}).`, "err");
+    return;
+  }
 
   try {
     const ackPromise = waitForAck();
 
-    const startReport = new Uint8Array(REPORT_LENGTH);
-    startReport[0] = 1;
-    startReport[1] = jsonBytes.length & 0xFF;
-    startReport[2] = (jsonBytes.length >> 8) & 0xFF;
-    await hidDevice.sendReport(REPORT_ID_OUT, startReport);
-    await sleep(PACKET_DELAY_MS);
+    const report = new Uint8Array(REPORT_LENGTH_OUT);
+    report[0] = jsonBytes.length & 0xFF;
+    report[1] = (jsonBytes.length >> 8) & 0xFF;
+    report.set(jsonBytes, 2);
 
-    const chunkSize = 62;
-    for (let offset = 0; offset < jsonBytes.length; offset += chunkSize) {
-      const chunk = jsonBytes.slice(offset, offset + chunkSize);
-      const report = new Uint8Array(REPORT_LENGTH);
-      report[0] = 2;
-      report.set(chunk, 1);
-      await hidDevice.sendReport(REPORT_ID_OUT, report);
-      await sleep(PACKET_DELAY_MS);
-    }
-
-    const endReport = new Uint8Array(REPORT_LENGTH);
-    endReport[0] = 3;
-    await hidDevice.sendReport(REPORT_ID_OUT, endReport);
+    await hidDevice.sendReport(REPORT_ID_OUT, report);
 
     log("Configuration transmise, en attente de confirmation du Pico...");
     await ackPromise;
   } catch (err) {
     if (err.message === "timeout") {
-      log("Pas de confirmation du Pico (paquets perdus ?). Recharge la page et réessaie.", "err");
+      log("Pas de confirmation du Pico. Verifie boot.py/code.py a jour puis reconnecte.", "err");
     } else if (err.message === "refused") {
-      // message déjà loggé dans handleInputReport
+      // message deja loggue dans handleInputReport
     } else {
       log("Erreur lors de l'envoi : " + err.message, "err");
     }

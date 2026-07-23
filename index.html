@@ -410,7 +410,7 @@ async function sendConfigToDevice() {
       report[0] = 2;
       report.set(chunk, 1);
       await hidDevice.sendReport(REPORT_ID_OUT, report);
-      await sleep(15);
+      await sleep(50);
     }
 
     const endReport = new Uint8Array(REPORT_LENGTH);

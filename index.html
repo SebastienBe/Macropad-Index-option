@@ -401,7 +401,7 @@ async function sendConfigToDevice() {
     startReport[1] = jsonBytes.length & 0xFF;
     startReport[2] = (jsonBytes.length >> 8) & 0xFF;
     await hidDevice.sendReport(REPORT_ID_OUT, startReport);
-    await sleep(15);
+    await sleep(50);
 
     const chunkSize = 62;
     for (let offset = 0; offset < jsonBytes.length; offset += chunkSize) {

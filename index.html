@@ -187,10 +187,8 @@
 
 <script>
 const NUM_BUTTONS = 7;
-const pinNames = ["GP0","GP1","GP2","GP3","GP4","GP5","GP6"];
+const pinNames = ["GP0","GP3","GP5","GP6","GP8","GP10","GP12"];
 const REPORT_LENGTH = 64;
-const REPORT_ID_IN = 10;
-const REPORT_ID_OUT = 11;
 
 const mediaOptions = [
   { value: "MUTE", label: "Mute" },
@@ -331,6 +329,8 @@ function readConfig() {
   return { buttons, volume };
 }
 
+// --- WebHID ---
+
 async function connectDevice() {
   if (!("hid" in navigator)) {
     document.getElementById("browserWarning").style.display = "block";
@@ -349,6 +349,7 @@ async function connectDevice() {
 
     hidDevice = devices[0];
     await hidDevice.open();
+
     hidDevice.addEventListener("inputreport", handleInputReport);
 
     setStatus(true, `Connecté : ${hidDevice.productName || "Pico Macropad"}`);
@@ -372,12 +373,12 @@ async function disconnectDevice() {
 
 function handleInputReport(event) {
   const { reportId, data } = event;
-  if (reportId === REPORT_ID_IN) {
+  if (reportId === 1) {
     const status = data.getUint8(0);
     if (status === 0x01) {
       log("Configuration appliquée avec succès sur le Pico.", "ok");
     } else {
-      log("Le Pico a refusé la configuration.", "err");
+      log("Le Pico a refusé la configuration (JSON invalide ?).", "err");
     }
   }
 }
@@ -396,26 +397,29 @@ async function sendConfigToDevice() {
   log(`Envoi de la configuration (${jsonBytes.length} octets)...`);
 
   try {
+    // Message START : longueur totale sur 2 octets (little-endian)
     const startReport = new Uint8Array(REPORT_LENGTH);
     startReport[0] = 1;
     startReport[1] = jsonBytes.length & 0xFF;
     startReport[2] = (jsonBytes.length >> 8) & 0xFF;
-    await hidDevice.sendReport(REPORT_ID_OUT, startReport);
-    await sleep(50);
+    await hidDevice.sendReport(2, startReport);
+    await sleep(15);
 
+    // Messages CHUNK : jusqu'à 62 octets utiles par rapport (byte0 = type, bytes1..62)
     const chunkSize = 62;
     for (let offset = 0; offset < jsonBytes.length; offset += chunkSize) {
       const chunk = jsonBytes.slice(offset, offset + chunkSize);
       const report = new Uint8Array(REPORT_LENGTH);
       report[0] = 2;
       report.set(chunk, 1);
-      await hidDevice.sendReport(REPORT_ID_OUT, report);
-      await sleep(50);
+      await hidDevice.sendReport(2, report);
+      await sleep(15);
     }
 
+    // Message END : déclenche le parsing + sauvegarde côté Pico
     const endReport = new Uint8Array(REPORT_LENGTH);
     endReport[0] = 3;
-    await hidDevice.sendReport(REPORT_ID_OUT, endReport);
+    await hidDevice.sendReport(2, endReport);
 
     log("Configuration transmise, en attente de confirmation du Pico...");
   } catch (err) {

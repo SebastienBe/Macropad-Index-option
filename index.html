@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
 <title>Configurateur Macropad Pico 2 (WebHID)</title>
 <style>
   :root {
@@ -189,6 +190,8 @@
 const NUM_BUTTONS = 7;
 const pinNames = ["GP0","GP3","GP5","GP6","GP8","GP10","GP12"];
 const REPORT_LENGTH = 64;
+const REPORT_ID_IN = 10;
+const REPORT_ID_OUT = 11;
 
 const mediaOptions = [
   { value: "MUTE", label: "Mute" },
@@ -373,7 +376,7 @@ async function disconnectDevice() {
 
 function handleInputReport(event) {
   const { reportId, data } = event;
-  if (reportId === 1) {
+  if (reportId === REPORT_ID_IN) {
     const status = data.getUint8(0);
     if (status === 0x01) {
       log("Configuration appliquée avec succès sur le Pico.", "ok");
@@ -402,7 +405,7 @@ async function sendConfigToDevice() {
     startReport[0] = 1;
     startReport[1] = jsonBytes.length & 0xFF;
     startReport[2] = (jsonBytes.length >> 8) & 0xFF;
-    await hidDevice.sendReport(2, startReport);
+    await hidDevice.sendReport(REPORT_ID_OUT, startReport);
     await sleep(15);
 
     // Messages CHUNK : jusqu'à 62 octets utiles par rapport (byte0 = type, bytes1..62)
@@ -412,14 +415,14 @@ async function sendConfigToDevice() {
       const report = new Uint8Array(REPORT_LENGTH);
       report[0] = 2;
       report.set(chunk, 1);
-      await hidDevice.sendReport(2, report);
+      await hidDevice.sendReport(REPORT_ID_OUT, report);
       await sleep(15);
     }
 
     // Message END : déclenche le parsing + sauvegarde côté Pico
     const endReport = new Uint8Array(REPORT_LENGTH);
     endReport[0] = 3;
-    await hidDevice.sendReport(2, endReport);
+    await hidDevice.sendReport(REPORT_ID_OUT, endReport);
 
     log("Configuration transmise, en attente de confirmation du Pico...");
   } catch (err) {
